@@ -161,7 +161,7 @@ Engine.prototype = {
         }
     },
     sendHunters: function () {
-        var catpower = this.craftManager.getResource('manpower');
+        var catpower = this.craftManager.getResource('catpower');
         var workshop = game.workshop;
         var parchment = workshop.getCraft('parchment');
 
@@ -174,8 +174,10 @@ Engine.prototype = {
             // Generate luxury goods before sending hunters
             if (options.toggle.luxury) this.startCrafts('luxury', options.auto.luxury);
 
-            message('Kittens Hunt: Hunters deployed!');
-            $("a:contains('Send hunters')").click();
+            var count = Math.floor(this.craftManager.getValueAvailable('catpower') * options.amount.consume / 100);
+
+            game.village.huntMultiple(count);
+            message("Kittens Hunt: Hunters deployed x" + count + "!");
         }
     },
     startBuilds: function (type, builds) {
@@ -646,3 +648,50 @@ $.each(Object.keys(options.toggle), function (event, option) {
         }
     });
 });
+
+// Fixes to game
+// =============
+game.village.huntMultiple = function(count) {
+
+    var mpower = this.game.resPool.get("manpower");
+
+    var squads = Math.floor(mpower.value / 100);
+    if (squads < 1){
+        return;
+    }
+    if (squads > count) squads = count;
+
+    mpower.value -= squads*100;
+
+    var totalYield = {
+        furs: 0,
+        ivory: 0,
+        gold: 0,
+        unicorns: 0
+    };
+
+    for (var i = squads - 1; i >= 0; i--) {
+        var squadYield = this.sendHuntersInternal();
+        totalYield.furs += squadYield.furs;
+        totalYield.ivory += squadYield.ivory;
+        totalYield.gold += squadYield.gold;
+        if (squadYield.isUnicorn) {
+            totalYield.unicorns++;
+        }
+    }
+    if (totalYield.unicorns){
+        this.game.msg("You got " + totalYield.unicorns === 1 ? "a unicorn!" : + totalYield.unicorns + " unicorns!");
+    }
+    var msg = "Your hunters have returned";
+    if (squads > 1) {
+        msg += " from " + squads + " hunts";
+    }
+    msg += ". +" + this.game.getDisplayValueExt(totalYield.furs) + " furs";
+    if (totalYield.ivory){
+        msg += ", +" + this.game.getDisplayValueExt(totalYield.ivory) + " ivory";
+    }
+    if (totalYield.gold){
+        msg += ", +" + this.game.getDisplayValueExt(totalYield.gold) + " gold";
+    }
+    this.game.msg( msg );
+}
